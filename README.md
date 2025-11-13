@@ -35,7 +35,7 @@ O sistema implementa **3 níveis de acesso**:
 - **Maven 3.6+**: Gerenciamento de dependências
 - **SLF4J**: Sistema de logging
 
-## 📦 Estrutura do Projeto
+## Estrutura do Projeto
 
 ```
 biometric-auth-system/
@@ -189,7 +189,7 @@ mvn -version
    - Acessos bem-sucedidos/negados
    - Status do modelo de reconhecimento
 
-## 🔧 Configurações
+## Configurações
 
 ### Threshold de Confiança
 
