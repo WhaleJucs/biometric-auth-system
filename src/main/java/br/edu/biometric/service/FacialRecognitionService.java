@@ -4,8 +4,11 @@ import org.opencv.core.*;
 import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
 import org.opencv.objdetect.CascadeClassifier;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -16,6 +19,7 @@ import java.util.Map;
  */
 public class FacialRecognitionService {
 
+    private static final Logger logger = LoggerFactory.getLogger(FacialRecognitionService.class);
     private static final String HAAR_CASCADE_PATH = "haarcascades/haarcascade_frontalface_default.xml";
     private static final int CONFIDENCE_THRESHOLD = 70; // Quanto menor, mais confiança
     private static final Size FACE_SIZE = new Size(200, 200);
@@ -27,37 +31,82 @@ public class FacialRecognitionService {
 
     public FacialRecognitionService() {
         try {
-            System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
+            logger.info("Carregando biblioteca OpenCV...");
+            // A biblioteca org.openpnp:opencv carrega as bibliotecas nativas
+            // automaticamente
+            nu.pattern.OpenCV.loadLocally();
+            logger.info("Biblioteca OpenCV carregada com sucesso. Versão: {}", Core.VERSION);
             initialize();
-        } catch (UnsatisfiedLinkError e) {
-            System.err.println("Erro ao carregar biblioteca OpenCV: " + e.getMessage());
+        } catch (Exception e) {
+            logger.error("Erro ao carregar biblioteca OpenCV: {}", e.getMessage(), e);
             initialized = false;
         }
     }
 
     private void initialize() {
-        // Carrega o classificador Haar Cascade
+        logger.info("Inicializando serviço de reconhecimento facial...");
         faceDetector = new CascadeClassifier();
 
-        // Tenta carregar do resources
-        File cascadeFile = new File(HAAR_CASCADE_PATH);
-        if (!cascadeFile.exists()) {
-            // Tenta carregar do resources
-            String resourcePath = getClass().getClassLoader().getResource(HAAR_CASCADE_PATH) != null
-                    ? getClass().getClassLoader().getResource(HAAR_CASCADE_PATH).getPath()
-                    : HAAR_CASCADE_PATH;
-            cascadeFile = new File(resourcePath);
+        // Tenta múltiplos caminhos para encontrar o arquivo Haar Cascade
+        String cascadePath = null;
+
+        // Tentativa 1: Carregar do classpath como recurso
+        try {
+            URL resourceUrl = getClass().getClassLoader().getResource(HAAR_CASCADE_PATH);
+            if (resourceUrl != null) {
+                cascadePath = resourceUrl.getPath();
+                // Remove a barra inicial no Windows (ex: /C:/... -> C:/...)
+                if (cascadePath.startsWith("/") && cascadePath.contains(":")) {
+                    cascadePath = cascadePath.substring(1);
+                }
+                logger.info("Tentando carregar Haar Cascade do classpath: {}", cascadePath);
+                if (new File(cascadePath).exists()) {
+                    faceDetector.load(cascadePath);
+                    if (!faceDetector.empty()) {
+                        initialized = true;
+                        logger.info("Haar Cascade carregado com sucesso do classpath!");
+                        return;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            logger.warn("Não foi possível carregar do classpath: {}", e.getMessage());
         }
 
-        if (cascadeFile.exists()) {
-            faceDetector.load(cascadeFile.getAbsolutePath());
-        } else {
-            System.err.println("Arquivo Haar Cascade não encontrado!");
-            initialized = false;
-            return;
+        // Tentativa 2: Carregar de target/classes
+        try {
+            cascadePath = "target/classes/" + HAAR_CASCADE_PATH;
+            logger.info("Tentando carregar Haar Cascade de: {}", cascadePath);
+            if (new File(cascadePath).exists()) {
+                faceDetector.load(cascadePath);
+                if (!faceDetector.empty()) {
+                    initialized = true;
+                    logger.info("Haar Cascade carregado com sucesso de target/classes!");
+                    return;
+                }
+            }
+        } catch (Exception e) {
+            logger.warn("Não foi possível carregar de target/classes: {}", e.getMessage());
         }
 
-        initialized = !faceDetector.empty();
+        // Tentativa 3: Carregar de src/main/resources
+        try {
+            cascadePath = "src/main/resources/" + HAAR_CASCADE_PATH;
+            logger.info("Tentando carregar Haar Cascade de: {}", cascadePath);
+            if (new File(cascadePath).exists()) {
+                faceDetector.load(cascadePath);
+                if (!faceDetector.empty()) {
+                    initialized = true;
+                    logger.info("Haar Cascade carregado com sucesso de src/main/resources!");
+                    return;
+                }
+            }
+        } catch (Exception e) {
+            logger.warn("Não foi possível carregar de src/main/resources: {}", e.getMessage());
+        }
+
+        logger.error("Arquivo Haar Cascade não encontrado em nenhum dos caminhos tentados!");
+        initialized = false;
     }
 
     /**
@@ -70,25 +119,32 @@ public class FacialRecognitionService {
         List<Rect> faces = new ArrayList<>();
 
         if (!initialized) {
-            System.err.println("Serviço de reconhecimento facial não inicializado!");
+            logger.error("Serviço de reconhecimento facial não inicializado!");
             return faces;
         }
 
-        Mat image = Imgcodecs.imread(imagePath);
-        if (image.empty()) {
-            System.err.println("Não foi possível carregar a imagem: " + imagePath);
-            return faces;
-        }
+        try {
+            Mat image = Imgcodecs.imread(imagePath);
+            if (image.empty()) {
+                logger.error("Não foi possível carregar a imagem: {}", imagePath);
+                return faces;
+            }
 
-        Mat grayImage = new Mat();
-        Imgproc.cvtColor(image, grayImage, Imgproc.COLOR_BGR2GRAY);
-        Imgproc.equalizeHist(grayImage, grayImage);
+            Mat grayImage = new Mat();
+            Imgproc.cvtColor(image, grayImage, Imgproc.COLOR_BGR2GRAY);
+            Imgproc.equalizeHist(grayImage, grayImage);
 
-        MatOfRect faceDetections = new MatOfRect();
-        faceDetector.detectMultiScale(grayImage, faceDetections);
+            MatOfRect faceDetections = new MatOfRect();
+            // Parâmetros baseados no projeto de referência
+            faceDetector.detectMultiScale(grayImage, faceDetections, 1.3, 3, 0, new Size(30, 30), new Size());
 
-        for (Rect rect : faceDetections.toArray()) {
-            faces.add(rect);
+            for (Rect rect : faceDetections.toArray()) {
+                faces.add(rect);
+            }
+
+            logger.info("Detectadas {} face(s) na imagem: {}", faces.size(), imagePath);
+        } catch (Exception e) {
+            logger.error("Erro ao detectar faces: {}", e.getMessage(), e);
         }
 
         return faces;
@@ -128,25 +184,33 @@ public class FacialRecognitionService {
      */
     public void trainRecognizer(List<String> imagePaths, int label) {
         if (!initialized) {
-            System.err.println("Serviço não inicializado!");
+            logger.error("Serviço não inicializado!");
             return;
         }
 
         List<Mat> faces = new ArrayList<>();
 
         for (String path : imagePaths) {
-            Mat face = extractFace(path);
-            if (face != null) {
-                faces.add(face);
+            try {
+                Mat face = extractFace(path);
+                if (face != null) {
+                    faces.add(face);
+                    logger.debug("Face extraída com sucesso de: {}", path);
+                } else {
+                    logger.warn("Nenhuma face detectada em: {}", path);
+                }
+            } catch (Exception e) {
+                logger.error("Erro ao extrair face de {}: {}", path, e.getMessage());
             }
         }
 
         if (faces.isEmpty()) {
-            System.err.println("Nenhuma face foi extraída para treinamento!");
+            logger.error("Nenhuma face foi extraída para treinamento do label {}!", label);
             return;
         }
 
         trainedFaces.put(label, faces);
+        logger.info("Reconhecedor treinado para label {} com {} face(s)", label, faces.size());
     }
 
     /**
@@ -157,45 +221,56 @@ public class FacialRecognitionService {
      */
     public int[] recognizeFace(String imagePath) {
         if (!initialized || trainedFaces.isEmpty()) {
+            logger.warn("Reconhecimento impossível: initialized={}, trainedFaces={}", initialized, trainedFaces.size());
             return null;
         }
 
-        Mat face = extractFace(imagePath);
-        if (face == null) {
-            return null;
-        }
+        try {
+            Mat face = extractFace(imagePath);
+            if (face == null) {
+                logger.warn("Nenhuma face detectada em: {}", imagePath);
+                return null;
+            }
 
-        // Calcula histograma da face a ser reconhecida
-        Mat hist = calculateHistogram(face);
+            // Calcula histograma da face a ser reconhecida
+            Mat hist = calculateHistogram(face);
 
-        int bestLabel = -1;
-        double bestDistance = Double.MAX_VALUE;
+            int bestLabel = -1;
+            double bestDistance = Double.MAX_VALUE;
 
-        // Compara com todas as faces treinadas
-        for (Map.Entry<Integer, List<Mat>> entry : trainedFaces.entrySet()) {
-            int label = entry.getKey();
-            List<Mat> trainedFacesForLabel = entry.getValue();
+            // Compara com todas as faces treinadas
+            for (Map.Entry<Integer, List<Mat>> entry : trainedFaces.entrySet()) {
+                int label = entry.getKey();
+                List<Mat> trainedFacesForLabel = entry.getValue();
 
-            for (Mat trainedFace : trainedFacesForLabel) {
-                Mat trainedHist = calculateHistogram(trainedFace);
-                double distance = compareHistograms(hist, trainedHist);
+                for (Mat trainedFace : trainedFacesForLabel) {
+                    Mat trainedHist = calculateHistogram(trainedFace);
+                    double distance = compareHistograms(hist, trainedHist);
 
-                if (distance < bestDistance) {
-                    bestDistance = distance;
-                    bestLabel = label;
+                    if (distance < bestDistance) {
+                        bestDistance = distance;
+                        bestLabel = label;
+                    }
                 }
             }
-        }
 
-        if (bestLabel == -1) {
+            if (bestLabel == -1) {
+                logger.warn("Nenhum match encontrado para a imagem: {}", imagePath);
+                return null;
+            }
+
+            // Converte distância para confiança (quanto menor a distância, maior a
+            // confiança)
+            int confidence = (int) (bestDistance * 100);
+
+            logger.info("Face reconhecida - Label: {}, Confiança: {}, Distância: {}", bestLabel, confidence,
+                    bestDistance);
+            return new int[] { bestLabel, confidence };
+
+        } catch (Exception e) {
+            logger.error("Erro ao reconhecer face: {}", e.getMessage(), e);
             return null;
         }
-
-        // Converte distância para confiança (quanto menor a distância, maior a
-        // confiança)
-        int confidence = (int) (bestDistance * 100); // Ajuste conforme necessário
-
-        return new int[] { bestLabel, confidence };
     }
 
     /**

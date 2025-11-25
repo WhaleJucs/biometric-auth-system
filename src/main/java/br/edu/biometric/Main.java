@@ -3,7 +3,6 @@ package br.edu.biometric;
 import br.edu.biometric.view.MainFrame;
 
 import javax.swing.*;
-import java.awt.*;
 
 /**
  * Classe principal do sistema de autenticação biométrica
@@ -23,15 +22,15 @@ public class Main {
             try {
                 MainFrame frame = new MainFrame();
                 frame.setVisible(true);
-                
+
                 // Exibe mensagem de boas-vindas
                 JOptionPane.showMessageDialog(frame,
                         "Bem-vindo ao Sistema de Autenticação Biométrica!\n\n" +
-                        "Este sistema permite:\n" +
-                        "- Autenticação por reconhecimento facial\n" +
-                        "- Gerenciamento de usuários\n" +
-                        "- Controle de acesso por níveis\n" +
-                        "- Visualização de logs e estatísticas",
+                                "Este sistema permite:\n" +
+                                "- Autenticação por reconhecimento facial\n" +
+                                "- Gerenciamento de usuários\n" +
+                                "- Controle de acesso por níveis\n" +
+                                "- Visualização de logs e estatísticas",
                         "Bem-vindo",
                         JOptionPane.INFORMATION_MESSAGE);
             } catch (Exception e) {
@@ -44,4 +43,3 @@ public class Main {
         });
     }
 }
-

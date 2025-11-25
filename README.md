@@ -4,8 +4,25 @@ Sistema de Identificação e Autenticação Biométrica para Controle de Acesso 
 
 ## Descrição
 
-Este sistema foi desenvolvido como parte de uma atividade prática supervisionada (APS) para a disciplina de **Processamento de Imagem e Visão Computacional (PIVC)**. 
+Este sistema foi desenvolvido como parte de uma atividade prática supervisionada (APS) para a disciplina de **Processamento de Imagem e Visão Computacional (PIVC)**.
 O sistema utiliza reconhecimento facial para controlar o acesso a informações estratégicas sobre propriedades rurais que utilizam agrotóxicos proibidos.
+
+## Visão Geral Rápida
+
+Se você já tem Java 11+ e Maven instalados:
+
+```powershell
+git clone <URL_DO_REPOSITORIO>
+cd biometric-auth-system
+mvn clean package
+java --enable-native-access=ALL-UNNAMED -jar target/biometric-auth-system-1.0.0-jar-with-dependencies.jar
+```
+
+Depois que a aplicação abrir:
+
+1. Vá em "Usuários > Gerenciar Usuários" e cadastre pelo menos 1 usuário com imagens faciais.
+2. Vá em "Sistema > Autenticação" e teste o login com uma das imagens cadastradas.
+3. Consulte "Relatórios > Logs de Acesso" e "Relatórios > Dashboard".
 
 ## Funcionalidades
 
@@ -34,6 +51,16 @@ O sistema implementa **3 níveis de acesso**:
 - **Gson 2.10.1**: Persistência em JSON
 - **Maven 3.6+**: Gerenciamento de dependências
 - **SLF4J**: Sistema de logging
+
+### Sobre OpenCV e Carregamento Nativo
+
+O projeto usa a dependência `org.openpnp:opencv` que embala automaticamente as bibliotecas nativas. O carregamento é feito por `nu.pattern.OpenCV.loadLocally()`. Em versões mais novas do JDK (21+), você pode ver warnings sobre acesso nativo restrito. Use a flag:
+
+```powershell
+java --enable-native-access=ALL-UNNAMED -jar target/biometric-auth-system-1.0.0-jar-with-dependencies.jar
+```
+
+Isso elimina o warning: `Restricted methods will be blocked...`.
 
 ## Estrutura do Projeto
 
@@ -92,6 +119,7 @@ biometric-auth-system/
 #### 1. Instalar Java JDK 11+
 
 **Windows:**
+
 1. Baixe o JDK 11 ou superior do site oficial
 2. Execute o instalador e siga as instruções
 3. Configure a variável de ambiente `JAVA_HOME`:
@@ -101,6 +129,7 @@ biometric-auth-system/
    - Reinicie o terminal/PowerShell
 
 **Verificar instalação:**
+
 ```bash
 java -version
 ```
@@ -108,6 +137,7 @@ java -version
 #### 2. Instalar Maven 3.6+
 
 **Windows:**
+
 1. Baixe o Maven do site oficial (arquivo `.zip`)
 2. Extraia para um diretório (ex: `C:\Program Files\Apache\maven`)
 3. Configure as variáveis de ambiente:
@@ -116,6 +146,7 @@ java -version
    - Reinicie o terminal/PowerShell
 
 **Verificar instalação:**
+
 ```bash
 mvn -version
 ```
@@ -123,31 +154,199 @@ mvn -version
 ### Passos para Instalação
 
 1. **Clone o repositório** (ou baixe o projeto):
+
    ```bash
    git clone <url-do-repositório>
    cd biometric-auth-system
    ```
 
 2. **Baixe o arquivo Haar Cascade**:
+
    - Baixe o arquivo `haarcascade_frontalface_default.xml` do [repositório oficial do OpenCV](https://github.com/opencv/opencv/blob/master/data/haarcascades/haarcascade_frontalface_default.xml)
    - Coloque-o em `src/main/resources/haarcascades/`
    - O arquivo é necessário para a detecção de faces
 
 3. **Compile o projeto**:
+
    ```bash
    mvn clean compile
    ```
 
 4. **Execute o projeto**:
+
    ```bash
    mvn exec:java -Dexec.mainClass="br.edu.biometric.Main"
    ```
 
    Ou compile um JAR executável:
+
    ```bash
    mvn clean package
    java -jar target/biometric-auth-system-1.0.0-jar-with-dependencies.jar
    ```
+
+#### Execução via IDE (IntelliJ ou VS Code)
+
+1. Importe o projeto Maven.
+2. Garanta que o SDK configurado é Java 11+.
+3. Marque `src/main/java` como Source Root (se necessário).
+4. Rode a classe `br.edu.biometric.Main`.
+5. (Opcional) Para remover warnings OpenCV: adicione em Run Configuration / VM Options: `--enable-native-access=ALL-UNNAMED`.
+
+#### Estrutura dos Arquivos de Dados (JSON)
+
+`data/users.json` cada usuário contém (campos principais):
+
+```json
+{
+  "id": "<uuid>",
+  "name": "Nome Completo",
+  "cpf": "123.456.789-09",
+  "email": "email@dominio.com",
+  "accessLevel": "ADMIN",
+  "biometricDataPaths": ["c:/caminho/face1.jpg", "c:/caminho/face2.jpg"],
+  "active": true,
+  "createdAt": "2025-11-24T22:18:34.123",
+  "updatedAt": "2025-11-24T22:19:10.456"
+}
+```
+
+`data/access_logs.json` cada log contém:
+
+```json
+{
+  "id": "<uuid>",
+  "userId": "<uuid-ou-null>",
+  "userName": "Nome ou Desconhecido",
+  "accessLevel": "ADVANCED", // nível solicitado
+  "timestamp": "2025-11-24T22:25:11.987",
+  "status": "SUCCESS", // ou DENIED_* / ERROR
+  "details": "Bem-vindo(a), Nome! Confiança: 92.00%",
+  "confidenceScore": 92.0
+}
+```
+
+## Fluxo de Uso Recomendado
+
+1. Cadastrar usuários (mínimo 1) com 2–3 imagens cada.
+2. Confirmar no Dashboard que o modelo está "Treinado".
+3. Realizar autenticações com imagens originais ou similares.
+4. Consultar logs e ajustar threshold se necessário.
+
+## Validações Implementadas
+
+| Campo   | Regra                                                      |
+| ------- | ---------------------------------------------------------- |
+| Nome    | Mínimo 3 caracteres; apenas letras e espaços (acentos OK)  |
+| CPF     | 11 dígitos válidos com verificação dos dígitos (módulo 11) |
+| Email   | Padrão simples `usuario@dominio`                           |
+| Imagens | Pelo menos uma imagem para permitir treinamento            |
+
+## Ajustes de Configuração Importantes
+
+| Configuração                | Local                      | Padrão  | Observação                                 |
+| --------------------------- | -------------------------- | ------- | ------------------------------------------ |
+| Threshold de confiança      | `FacialRecognitionService` | 70      | Menor = mais rigoroso (distâncias menores) |
+| Tamanho normalizado da face | `FACE_SIZE`                | 200x200 | Uniformiza histogramas                     |
+
+Para calibrar: reduza o threshold se muitas falsas aprovações ocorrerem; aumente se estiver barrando usuários legítimos.
+
+## Boas Práticas para Melhora do Reconhecimento
+
+- Use imagens nítidas, boa iluminação e face de frente.
+- Evite fundos extremamente complexos ou sombras fortes.
+- Cadastre múltiplas imagens com pequenas variações (ângulo leve, expressão neutra).
+- Não misture resoluções muito diferentes; mantenha qualidade similar.
+
+## Suprimindo Warnings do OpenCV (JDK 21+)
+
+Se aparecer:
+
+```
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load...
+```
+
+Execute com:
+
+```powershell
+java --enable-native-access=ALL-UNNAMED -jar target/biometric-auth-system-1.0.0-jar-with-dependencies.jar
+```
+
+Isso informa à JVM que o carregamento nativo é intencional.
+
+## Backup e Restauração dos Dados
+
+Para backup, copie a pasta `data/` inteira (incluindo `biometric/`).
+
+```powershell
+Compress-Archive -Path data -DestinationPath backup-data.zip
+```
+
+Para restaurar, extraia sobre o diretório do projeto antes de iniciar a aplicação.
+
+## Limitações Conhecidas
+
+- Comparação de histogramas é menos robusta que LBPH/EigenFaces/Deep Learning.
+- Sensível a variações fortes de iluminação ou pose.
+- Não faz detecção multi-usuário simultânea (uma face por autenticação).
+- Não há verificação de qualidade automática (ruído, blur).
+
+## Estratégias Futuras (Sugestões)
+
+- Migrar para LBPH (requer opencv-contrib) ou embeddings faciais (FaceNet/Dlib).
+- Adicionar captura direta por webcam (já existe referência mas não integrada aqui por escopo).
+- Criptografar caminhos ou imagens para maior privacidade.
+- Implementar testes automatizados de validação.
+
+## Solução de Problemas (Resumo Rápido)
+
+| Problema                                   | Causa Provável                      | Ação                                            |
+| ------------------------------------------ | ----------------------------------- | ----------------------------------------------- |
+| "Serviço de reconhecimento não disponível" | Falha ao carregar OpenCV            | Verificar dependência e usar flag native access |
+| "Nenhuma face detectada"                   | Imagem inadequada / cascade ausente | Verificar haarcascade e qualidade da imagem     |
+| Modelo não treina                          | Usuário sem imagens válidas         | Adicionar imagens claras com face frontal       |
+| Baixa confiança em usuários válidos        | Threshold alto ou poucas imagens    | Reduzir threshold / adicionar mais imagens      |
+| Falsos positivos                           | Threshold baixo demais              | Aumentar threshold gradualmente                 |
+
+## Testes Manuais Recomendados
+
+1. Cadastrar 2 usuários distintos (3 imagens cada).
+2. Autenticar imagem correta → sucesso.
+3. Autenticar imagem de outro usuário → negado.
+4. Ajustar nível de acesso para um usuário e testar restrição.
+5. Limpar logs e gerar novos para confirmar persistência.
+
+## Aviso de Privacidade / Ética
+
+Este sistema manipula dados biométricos (imagens faciais). Recomenda-se:
+
+- Obter consentimento explícito dos usuários.
+- Limitar acesso às imagens e arquivos JSON.
+- Avaliar anonimização ou criptografia em ambientes de produção.
+
+## Comandos Úteis (PowerShell)
+
+```powershell
+# Build completo
+mvn clean package
+
+# Execução com suprimir warnings nativos
+java --enable-native-access=ALL-UNNAMED -jar target/biometric-auth-system-1.0.0-jar-with-dependencies.jar
+
+# Limpar diretório de dados (cuidado: remove tudo)
+Remove-Item -Recurse -Force data
+```
+
+## Perguntas Frequentes (FAQ)
+
+**1. Posso usar Java 17 ou 21?** Sim, desde que mantenha a flag de native access para evitar warnings.
+**2. Preciso instalar OpenCV manualmente?** Não, a dependência Maven já inclui as libs nativas.
+**3. Como melhorar a precisão?** Mais imagens variadas e ajuste no threshold.
+**4. Posso trocar o classificador?** Sim, substitua o XML em `resources/haarcascades/`.
+**5. O que acontece se mover as imagens?** Caminhos quebrados exigem recadastro do usuário.
+
+---
 
 ## Como Usar
 
@@ -228,13 +427,15 @@ O sistema utiliza uma **implementação alternativa** baseada em comparação de
 
 ## Observações Importantes
 
-1. **Imagens Biométricas**: 
+1. **Imagens Biométricas**:
+
    - Use imagens com boa iluminação
    - Face frontal e visível
    - Múltiplas imagens melhoram a precisão
    - Imagens similares (mesmo ângulo, iluminação) tendem a ter melhor reconhecimento
 
 2. **Treinamento do Modelo**:
+
    - O modelo é treinado automaticamente ao salvar usuários
    - É necessário retreinar após adicionar novos usuários
    - O sistema armazena as faces normalizadas em memória durante a execução
@@ -306,4 +507,3 @@ Este projeto foi desenvolvido para fins acadêmicos como parte de uma atividade 
 ---
 
 **Desenvolvido para a disciplina de Processamento de Imagem e Visão Computacional (PIVC)**
-

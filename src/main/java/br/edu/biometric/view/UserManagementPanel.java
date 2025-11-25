@@ -8,8 +8,6 @@ import javax.swing.*;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
@@ -20,8 +18,7 @@ import java.util.List;
 public class UserManagementPanel extends JPanel {
 
     private AuthenticationService authService;
-    private MainFrame mainFrame;
-    
+
     private JTable userTable;
     private DefaultTableModel tableModel;
     private JTextField nameField;
@@ -36,12 +33,11 @@ public class UserManagementPanel extends JPanel {
     private JButton saveButton;
     private JButton deleteButton;
     private JButton newButton;
-    
+
     private User currentUser;
 
-    public UserManagementPanel(AuthenticationService authService, MainFrame mainFrame) {
+    public UserManagementPanel(AuthenticationService authService) {
         this.authService = authService;
-        this.mainFrame = mainFrame;
         this.biometricImagePaths = new ArrayList<>();
         initializePanel();
     }
@@ -52,7 +48,7 @@ public class UserManagementPanel extends JPanel {
 
         // Painel esquerdo - Lista de usuários
         JPanel leftPanel = createUserListPanel();
-        
+
         // Painel direito - Formulário de edição
         JPanel rightPanel = createUserFormPanel();
 
@@ -67,7 +63,7 @@ public class UserManagementPanel extends JPanel {
         JPanel panel = new JPanel(new BorderLayout());
 
         // Tabela de usuários
-        String[] columnNames = {"Nome", "CPF", "Email", "Nível", "Status"};
+        String[] columnNames = { "Nome", "CPF", "Email", "Nível", "Status" };
         tableModel = new DefaultTableModel(columnNames, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -158,7 +154,7 @@ public class UserManagementPanel extends JPanel {
         gbc.gridy = 4;
         gbc.fill = GridBagConstraints.NONE;
         formPanel.add(new JLabel("Imagens Biométricas:"), gbc);
-        
+
         gbc.gridx = 0;
         gbc.gridy = 5;
         gbc.gridwidth = 2;
@@ -214,7 +210,7 @@ public class UserManagementPanel extends JPanel {
             cpfField.setText(currentUser.getCpf());
             emailField.setText(currentUser.getEmail());
             accessLevelComboBox.setSelectedItem(currentUser.getAccessLevel());
-            
+
             imagesListModel.clear();
             biometricImagePaths.clear();
             for (String path : currentUser.getBiometricDataPaths()) {
@@ -264,9 +260,10 @@ public class UserManagementPanel extends JPanel {
     }
 
     private void saveUser() {
+        // Validações de campos vazios
         if (nameField.getText().trim().isEmpty() ||
-            cpfField.getText().trim().isEmpty() ||
-            emailField.getText().trim().isEmpty()) {
+                cpfField.getText().trim().isEmpty() ||
+                emailField.getText().trim().isEmpty()) {
             JOptionPane.showMessageDialog(this,
                     "Por favor, preencha todos os campos obrigatórios.",
                     "Aviso",
@@ -274,6 +271,34 @@ public class UserManagementPanel extends JPanel {
             return;
         }
 
+        // Validação do nome
+        if (!br.edu.biometric.util.Validator.isValidName(nameField.getText().trim())) {
+            JOptionPane.showMessageDialog(this,
+                    "Nome inválido! O nome deve ter pelo menos 3 caracteres e conter apenas letras.",
+                    "Erro de Validação",
+                    JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        // Validação do CPF
+        if (!br.edu.biometric.util.Validator.isValidCpf(cpfField.getText().trim())) {
+            JOptionPane.showMessageDialog(this,
+                    "CPF inválido! Verifique se o CPF está correto.",
+                    "Erro de Validação",
+                    JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        // Validação do email
+        if (!br.edu.biometric.util.Validator.isValidEmail(emailField.getText().trim())) {
+            JOptionPane.showMessageDialog(this,
+                    "Email inválido! Verifique o formato do email.",
+                    "Erro de Validação",
+                    JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        // Validação de imagens biométricas
         if (imagesListModel.isEmpty()) {
             JOptionPane.showMessageDialog(this,
                     "Por favor, adicione pelo menos uma imagem biométrica.",
@@ -289,8 +314,7 @@ public class UserManagementPanel extends JPanel {
                         nameField.getText().trim(),
                         cpfField.getText().trim(),
                         emailField.getText().trim(),
-                        (AccessLevel) accessLevelComboBox.getSelectedItem()
-                );
+                        (AccessLevel) accessLevelComboBox.getSelectedItem());
             } else {
                 // Atualizar usuário existente
                 currentUser.setName(nameField.getText().trim());
@@ -307,7 +331,7 @@ public class UserManagementPanel extends JPanel {
 
             // Salva usuário
             authService.getUserRepository().save(currentUser);
-            
+
             // Retreina o modelo
             authService.trainModel();
 
@@ -355,7 +379,7 @@ public class UserManagementPanel extends JPanel {
         tableModel.setRowCount(0);
         List<User> users = authService.getUserRepository().findAll();
         for (User user : users) {
-            tableModel.addRow(new Object[]{
+            tableModel.addRow(new Object[] {
                     user.getName(),
                     user.getCpf(),
                     user.getEmail(),
@@ -363,9 +387,8 @@ public class UserManagementPanel extends JPanel {
                     user.isActive() ? "Ativo" : "Inativo"
             });
         }
-        
+
         // Limpa formulário
         newUser();
     }
 }
-

@@ -4,8 +4,6 @@ import br.edu.biometric.service.AuthenticationService;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 
 /**
  * Janela principal do sistema com menu e painéis
@@ -43,7 +41,7 @@ public class MainFrame extends JFrame {
 
         // Menu Sistema
         JMenu systemMenu = new JMenu("Sistema");
-        
+
         JMenuItem loginItem = new JMenuItem("Autenticação");
         loginItem.addActionListener(e -> showLoginPanel());
         systemMenu.add(loginItem);
@@ -54,14 +52,14 @@ public class MainFrame extends JFrame {
 
         // Menu Usuários
         JMenu userMenu = new JMenu("Usuários");
-        
+
         JMenuItem manageUsersItem = new JMenuItem("Gerenciar Usuários");
         manageUsersItem.addActionListener(e -> showUserManagementPanel());
         userMenu.add(manageUsersItem);
 
         // Menu Relatórios
         JMenu reportsMenu = new JMenu("Relatórios");
-        
+
         JMenuItem dashboardItem = new JMenuItem("Dashboard");
         dashboardItem.addActionListener(e -> showDashboardPanel());
         reportsMenu.add(dashboardItem);
@@ -82,8 +80,8 @@ public class MainFrame extends JFrame {
         mainPanel = new JPanel(cardLayout);
 
         // Cria os painéis
-        loginPanel = new LoginPanel(authService, this);
-        userManagementPanel = new UserManagementPanel(authService, this);
+        loginPanel = new LoginPanel(authService);
+        userManagementPanel = new UserManagementPanel(authService);
         dashboardPanel = new DashboardPanel(authService);
         logsPanel = new LogsPanel(authService);
 
@@ -120,4 +118,3 @@ public class MainFrame extends JFrame {
         return authService;
     }
 }
-

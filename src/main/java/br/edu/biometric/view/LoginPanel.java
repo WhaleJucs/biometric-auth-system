@@ -7,8 +7,6 @@ import br.edu.biometric.service.AuthenticationResult;
 import javax.swing.*;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.io.File;
 
 /**
@@ -17,8 +15,7 @@ import java.io.File;
 public class LoginPanel extends JPanel {
 
     private AuthenticationService authService;
-    private MainFrame mainFrame;
-    
+
     private JComboBox<AccessLevel> levelComboBox;
     private JLabel imageLabel;
     private JLabel statusLabel;
@@ -26,9 +23,8 @@ public class LoginPanel extends JPanel {
     private JButton authenticateButton;
     private String selectedImagePath;
 
-    public LoginPanel(AuthenticationService authService, MainFrame mainFrame) {
+    public LoginPanel(AuthenticationService authService) {
         this.authService = authService;
-        this.mainFrame = mainFrame;
         initializePanel();
     }
 
@@ -110,15 +106,15 @@ public class LoginPanel extends JPanel {
 
     private void authenticate() {
         if (selectedImagePath == null || selectedImagePath.isEmpty()) {
-            JOptionPane.showMessageDialog(this, 
-                    "Por favor, selecione uma imagem primeiro.", 
-                    "Aviso", 
+            JOptionPane.showMessageDialog(this,
+                    "Por favor, selecione uma imagem primeiro.",
+                    "Aviso",
                     JOptionPane.WARNING_MESSAGE);
             return;
         }
 
         AccessLevel requiredLevel = (AccessLevel) levelComboBox.getSelectedItem();
-        
+
         // Desabilita botões durante autenticação
         authenticateButton.setEnabled(false);
         selectImageButton.setEnabled(false);
@@ -128,12 +124,12 @@ public class LoginPanel extends JPanel {
         SwingUtilities.invokeLater(() -> {
             try {
                 AuthenticationResult result = authService.authenticate(selectedImagePath, requiredLevel);
-                
+
                 // Atualiza UI com resultado
                 if (result.isSuccess()) {
                     statusLabel.setText(result.getMessage());
                     statusLabel.setForeground(new Color(0, 150, 0));
-                    
+
                     JOptionPane.showMessageDialog(this,
                             String.format("Autenticação bem-sucedida!\n\n" +
                                     "Usuário: %s\n" +
@@ -147,7 +143,7 @@ public class LoginPanel extends JPanel {
                 } else {
                     statusLabel.setText(result.getMessage());
                     statusLabel.setForeground(Color.RED);
-                    
+
                     JOptionPane.showMessageDialog(this,
                             result.getMessage(),
                             "Acesso Negado",
@@ -177,4 +173,3 @@ public class LoginPanel extends JPanel {
         levelComboBox.setSelectedIndex(0);
     }
 }
-

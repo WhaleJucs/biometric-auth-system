@@ -1,11 +1,9 @@
 package br.edu.biometric.view;
 
-import br.edu.biometric.model.AccessStatus;
 import br.edu.biometric.service.AuthenticationService;
 
 import javax.swing.*;
 import java.awt.*;
-import java.util.List;
 
 /**
  * Painel de dashboard com estatísticas do sistema
@@ -13,7 +11,7 @@ import java.util.List;
 public class DashboardPanel extends JPanel {
 
     private AuthenticationService authService;
-    
+
     private JLabel totalUsersLabel;
     private JLabel activeUsersLabel;
     private JLabel totalLogsLabel;
@@ -45,7 +43,7 @@ public class DashboardPanel extends JPanel {
         gbc.gridx = 0;
         gbc.gridy = 0;
         statsPanel.add(createStatCard("Total de Usuários", totalUsersLabel = new JLabel("0")), gbc);
-        
+
         gbc.gridx = 1;
         statsPanel.add(createStatCard("Usuários Ativos", activeUsersLabel = new JLabel("0")), gbc);
 
@@ -53,10 +51,10 @@ public class DashboardPanel extends JPanel {
         gbc.gridx = 0;
         gbc.gridy = 1;
         statsPanel.add(createStatCard("Total de Acessos", totalLogsLabel = new JLabel("0")), gbc);
-        
+
         gbc.gridx = 1;
         statsPanel.add(createStatCard("Acessos Bem-sucedidos", successfulLogsLabel = new JLabel("0")), gbc);
-        
+
         gbc.gridx = 0;
         gbc.gridy = 2;
         statsPanel.add(createStatCard("Acessos Negados", failedLogsLabel = new JLabel("0")), gbc);
@@ -122,4 +120,3 @@ public class DashboardPanel extends JPanel {
         }
     }
 }
-

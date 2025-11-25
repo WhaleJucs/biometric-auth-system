@@ -3,6 +3,8 @@ package br.edu.biometric.service;
 import br.edu.biometric.model.*;
 import br.edu.biometric.repository.AccessLogRepository;
 import br.edu.biometric.repository.UserRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.List;
@@ -13,7 +15,9 @@ import java.util.Optional;
  * Serviço responsável pela autenticação biométrica e controle de acesso
  */
 public class AuthenticationService {
-    
+
+    private static final Logger logger = LoggerFactory.getLogger(AuthenticationService.class);
+
     private final UserRepository userRepository;
     private final AccessLogRepository logRepository;
     private final FacialRecognitionService faceRecognitionService;
@@ -22,6 +26,7 @@ public class AuthenticationService {
     private boolean modelTrained = false;
 
     public AuthenticationService() {
+        logger.info("Inicializando AuthenticationService...");
         this.userRepository = new UserRepository();
         this.logRepository = new AccessLogRepository();
         this.faceRecognitionService = new FacialRecognitionService();
@@ -33,14 +38,16 @@ public class AuthenticationService {
      * Treina o modelo de reconhecimento facial com todos os usuários cadastrados
      */
     public void trainModel() {
+        logger.info("Iniciando treinamento do modelo...");
+
         if (!faceRecognitionService.isInitialized()) {
-            System.err.println("Serviço de reconhecimento facial não está disponível!");
+            logger.error("Serviço de reconhecimento facial não está disponível!");
             return;
         }
 
         List<User> users = userRepository.findAllActive();
         if (users.isEmpty()) {
-            System.out.println("Nenhum usuário cadastrado para treinamento.");
+            logger.warn("Nenhum usuário cadastrado para treinamento.");
             return;
         }
 
@@ -51,25 +58,32 @@ public class AuthenticationService {
             if (!user.getBiometricDataPaths().isEmpty()) {
                 int label = nextLabel++;
                 userLabelMap.put(user.getId(), label);
+                logger.debug("Treinando usuário {} ({}): label {}, {} imagens",
+                        user.getName(), user.getId(), label, user.getBiometricDataPaths().size());
                 faceRecognitionService.trainRecognizer(user.getBiometricDataPaths(), label);
+            } else {
+                logger.warn("Usuário {} ({}) não possui imagens biométricas", user.getName(), user.getId());
             }
         }
 
         modelTrained = !userLabelMap.isEmpty();
-        System.out.println("Modelo treinado com " + userLabelMap.size() + " usuários.");
+        logger.info("Modelo treinado com sucesso! Total de usuários: {}", userLabelMap.size());
     }
 
     /**
      * Autentica um usuário através de reconhecimento facial
-     * @param imagePath Caminho da imagem para autenticação
+     * 
+     * @param imagePath     Caminho da imagem para autenticação
      * @param requiredLevel Nível de acesso requerido
      * @return Resultado da autenticação
      */
     public AuthenticationResult authenticate(String imagePath, AccessLevel requiredLevel) {
+        logger.info("Iniciando autenticação: imagem={}, nivelRequerido={}", imagePath, requiredLevel);
         AuthenticationResult result = new AuthenticationResult();
 
         // Verifica se o serviço está disponível
         if (!faceRecognitionService.isInitialized()) {
+            logger.error("Falha na autenticação: serviço de reconhecimento facial não inicializado");
             result.setSuccess(false);
             result.setStatus(AccessStatus.ERROR);
             result.setMessage("Serviço de reconhecimento facial não disponível.");
@@ -79,6 +93,7 @@ public class AuthenticationService {
 
         // Verifica se há modelo treinado
         if (!modelTrained || userLabelMap.isEmpty()) {
+            logger.error("Falha na autenticação: modelo não treinado ou sem usuários");
             result.setSuccess(false);
             result.setStatus(AccessStatus.ERROR);
             result.setMessage("Nenhum usuário cadastrado no sistema.");
@@ -88,8 +103,9 @@ public class AuthenticationService {
 
         // Tenta reconhecer a face
         int[] recognition = faceRecognitionService.recognizeFace(imagePath);
-        
+
         if (recognition == null) {
+            logger.warn("Nenhuma face reconhecida na imagem: {}", imagePath);
             result.setSuccess(false);
             result.setStatus(AccessStatus.DENIED_NOT_RECOGNIZED);
             result.setMessage("Nenhuma face detectada ou reconhecida.");
@@ -101,11 +117,15 @@ public class AuthenticationService {
         int label = recognition[0];
         int confidenceValue = recognition[1];
         double confidencePercentage = faceRecognitionService.getConfidencePercentage(confidenceValue);
-        
+
+        logger.debug("Reconhecimento: label={}, confianca={}, porcentagem={}%", label, confidenceValue,
+                confidencePercentage);
         result.setConfidence(confidencePercentage);
 
         // Verifica a confiança do reconhecimento
         if (!faceRecognitionService.isConfidenceAcceptable(confidenceValue)) {
+            logger.warn("Confiança insuficiente: {}% (limiar: {}%)", confidencePercentage,
+                    faceRecognitionService.getConfidenceThreshold());
             result.setSuccess(false);
             result.setStatus(AccessStatus.DENIED_LOW_CONFIDENCE);
             result.setMessage(String.format("Confiança insuficiente: %.2f%%", confidencePercentage));
@@ -116,6 +136,7 @@ public class AuthenticationService {
         // Busca o usuário pelo label
         String userId = getUserIdByLabel(label);
         if (userId == null) {
+            logger.error("Label {} não mapeado para nenhum usuário", label);
             result.setSuccess(false);
             result.setStatus(AccessStatus.DENIED_NOT_RECOGNIZED);
             result.setMessage("Usuário não encontrado.");
@@ -125,6 +146,7 @@ public class AuthenticationService {
 
         Optional<User> userOpt = userRepository.findById(userId);
         if (userOpt.isEmpty()) {
+            logger.error("Usuário com ID {} não encontrado no repositório", userId);
             result.setSuccess(false);
             result.setStatus(AccessStatus.DENIED_NOT_RECOGNIZED);
             result.setMessage("Usuário não encontrado.");
@@ -134,9 +156,11 @@ public class AuthenticationService {
 
         User user = userOpt.get();
         result.setUser(user);
+        logger.debug("Usuário identificado: {} ({})", user.getName(), user.getId());
 
         // Verifica se o usuário está ativo
         if (!user.isActive()) {
+            logger.warn("Usuário {} está inativo", user.getName());
             result.setSuccess(false);
             result.setStatus(AccessStatus.DENIED_INACTIVE_USER);
             result.setMessage("Usuário inativo.");
@@ -146,19 +170,22 @@ public class AuthenticationService {
 
         // Verifica o nível de acesso
         if (!user.getAccessLevel().canAccess(requiredLevel)) {
+            logger.warn("Nível de acesso insuficiente: usuário={}, requerido={}",
+                    user.getAccessLevel(), requiredLevel);
             result.setSuccess(false);
             result.setStatus(AccessStatus.DENIED_INSUFFICIENT_PERMISSION);
-            result.setMessage(String.format("Acesso negado. Requer: %s, Possui: %s", 
-                    requiredLevel.getDisplayName(), 
+            result.setMessage(String.format("Acesso negado. Requer: %s, Possui: %s",
+                    requiredLevel.getDisplayName(),
                     user.getAccessLevel().getDisplayName()));
             logAccess(user, requiredLevel, result);
             return result;
         }
 
         // Autenticação bem-sucedida
+        logger.info("Autenticação bem-sucedida: usuário={}, confiança={}%", user.getName(), confidencePercentage);
         result.setSuccess(true);
         result.setStatus(AccessStatus.SUCCESS);
-        result.setMessage(String.format("Bem-vindo(a), %s! Confiança: %.2f%%", 
+        result.setMessage(String.format("Bem-vindo(a), %s! Confiança: %.2f%%",
                 user.getName(), confidencePercentage));
         logAccess(user, requiredLevel, result);
 
@@ -176,7 +203,7 @@ public class AuthenticationService {
         log.setStatus(result.getStatus());
         log.setDetails(result.getMessage());
         log.setConfidenceScore(result.getConfidence());
-        
+
         logRepository.save(log);
     }
 
@@ -200,4 +227,3 @@ public class AuthenticationService {
         return modelTrained;
     }
 }
-
